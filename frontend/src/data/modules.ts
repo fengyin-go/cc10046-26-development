@@ -200,6 +200,17 @@ export const MODULES: ModuleMeta[] = [
     actionTargets: {"触发同步": "待启动", "重置水位": "同步中断"},
     metrics: ["水位总数", "已同步水位", "待启动水位"],
   },
+  {
+    key: "window_failure_rate",
+    name: "窗口失败率",
+    entity: "窗口失败率",
+    desc: "按来源+窗口依据真实页面回执核算失败率，驱动采集调度暂停与恢复范围核对",
+    fields: ["窗口标识", "来源站点", "总页数", "失败页数", "失败率", "阈值", "是否暂停"],
+    statuses: ["已放行", "已暂停", "待确认更正"],
+    actions: [],
+    actionTargets: {},
+    metrics: ["窗口数", "已暂停分站", "待确认更正"],
+  },
 ]
 
 export const MODULE_BY_KEY: Map<string, ModuleMeta> = new Map(

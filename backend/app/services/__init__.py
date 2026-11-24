@@ -21,6 +21,16 @@ from app.services.source_auth import SourceAuthService
 from app.services.html_cleaner import HtmlCleanerService
 from app.services.incremental_sync import IncrementalSyncService
 from app.services.error_logger import ErrorLoggerService
+from app.services.error_record import ErrorRecordService
+from app.services.window_failure import (
+    WindowFailureRateService,
+    ThresholdDecisionService,
+    DispatchEntryService,
+    PausePlanService,
+    RecoveryPlanService,
+)
+from app.services.failure_window import FailureWindowService
+from app.services.failure_rate import FailureRateService
 from app.services.session_manager import SessionManagerService
 from app.services.data_cleanup import DataCleanupService
 
@@ -44,8 +54,22 @@ SERVICES: dict[str, BaseModuleService] = {
     "html_cleaner": HtmlCleanerService(),
     "incremental_sync": IncrementalSyncService(),
     "error_logger": ErrorLoggerService(),
+    "error_record": ErrorRecordService(),
     "session_manager": SessionManagerService(),
     "data_cleanup": DataCleanupService(),
+    # 窗口失败率/派工守卫特性的只读资源键
+    "window_failure_rate": WindowFailureRateService(),
+    "window_failure": WindowFailureRateService(),
+    "failure_window": FailureWindowService(),
+    "failure_rate": FailureRateService(),
+    "threshold_decision": ThresholdDecisionService(),
+    "fg_decision": ThresholdDecisionService(),
+    "dispatch_entry": DispatchEntryService(),
+    "fg_dispatch": DispatchEntryService(),
+    "pause_plan": PausePlanService(),
+    "fg_pause_plan": PausePlanService(),
+    "recovery_plan": RecoveryPlanService(),
+    "fg_recovery_plan": RecoveryPlanService(),
 }
 
 

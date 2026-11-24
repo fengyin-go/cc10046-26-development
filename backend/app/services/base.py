@@ -86,3 +86,18 @@ class BaseModuleService:
             "by_status": by_status,
             "abnormal": sum(1 for row in rows if row.get("abnormal")),
         }
+
+    # 窗口失败率/派工守卫特性的跨模块兜底：
+    # 未显式实现的 domain_* 方法按命名路由到 failure_guard 单例。
+    def __getattr__(self, name: str) -> Any:
+        if name.startswith("__") and name.endswith("__"):
+            raise AttributeError(name)
+        if not name.startswith("domain_"):
+            raise AttributeError(
+                f"{type(self).__name__!r} object has no attribute {name!r}")
+
+        def _route(*args: Any, **kwargs: Any) -> Any:
+            from app.services.failure_guard import failure_guard
+            return failure_guard.call(name, *args, **kwargs)
+
+        return _route

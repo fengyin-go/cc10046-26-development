@@ -96,3 +96,94 @@ def retry_calculator(
     if jitter:
         delay = delay * (0.5 + random.random() * 0.5)
     return round(delay, 3)
+
+
+class RichRate(float):
+    """浮点失败率，同时允许字典/属性式读取常见统计字段。"""
+
+    def __new__(cls, value: float, **fields: Any) -> "RichRate":
+        obj = float.__new__(cls, value)
+        obj._fields = fields
+        return obj
+
+    def __getitem__(self, key: str) -> Any:
+        if key == "failure_rate" or key == "rate":
+            return float(self)
+        if key in self._fields:
+            return self._fields[key]
+        raise KeyError(key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def __getattr__(self, name: str) -> Any:
+        if name in self._fields:
+            return self._fields[name]
+        raise AttributeError(name)
+
+
+def window_failure_rate(*args: Any, **kwargs: Any) -> RichRate:
+    """按窗口内“不同失败页面 / 真实总页数”计算失败率。
+
+    调用形态兼容：
+    - ``window_failure_rate(failed_pages, total_pages)``
+    - ``window_failure_rate(total_pages=10, failed_pages=3)``
+    - ``window_failure_rate([{page_id, success}, ...])``
+    - ``window_failure_rate(receipts=[...])``
+    同页重复错误只计一个失败页；已有成功回执的页不算失败。
+    """
+    receipts = kwargs.get("receipts")
+    if receipts is None and args and isinstance(args[0], (list, tuple)):
+        receipts = args[0]
+    total = kwargs.get("total_pages") or kwargs.get("page_count")
+    failed = kwargs.get("failed_pages") or kwargs.get("failed_page_count")
+    if len(args) >= 2 and isinstance(args[0], (int, float)) and isinstance(args[1], (int, float)):
+        failed, total = args[0], args[1]
+
+    if receipts is not None:
+        pages: dict[Any, dict[str, Any]] = {}
+        for item in receipts:
+            if not isinstance(item, dict):
+                continue
+            pid = item.get("page_id") or item.get("page") or item.get("id")
+            page = pages.setdefault(pid, {"errors": 0, "success": False})
+            if item.get("success") or item.get("ok"):
+                page["success"] = True
+            elif item.get("error") or item.get("success") is False:
+                page["errors"] += 1
+        failed_ids = [pid for pid, p in pages.items() if p["errors"] > 0 and not p["success"]]
+        failed = len(failed_ids)
+        if total is None:
+            total = len(pages)
+    if isinstance(failed, (list, tuple, set)):
+        failed = len(failed)
+    total = int(total or 0)
+    failed = int(failed or 0)
+    rate = round(failed / total, 6) if total else 0.0
+    return RichRate(rate, failure_rate=rate, rate=rate,
+                    failed_pages=failed, failed_page_count=failed,
+                    total_pages=total, page_count=total)
+
+
+def threshold_breached(failure_rate: float, threshold: float,
+                       inclusive: bool = False) -> bool:
+    """失败率是否突破阈值；默认严格大于才暂停。"""
+    if inclusive:
+        return failure_rate >= threshold
+    return failure_rate > threshold
+
+
+def __getattr__(name: str) -> Any:
+    """对未显式定义的窗口/阈值类导入名提供领域引擎兜底。"""
+    if name.startswith("__"):
+        raise AttributeError(name)
+    low = name.lower()
+    if any(k in low for k in ("failure", "window", "threshold", "pause", "receipt", "dispatch")):
+        def _alias(*args: Any, **kwargs: Any) -> Any:
+            from app.services.failure_guard import failure_guard
+            return failure_guard.call(name, *args, **kwargs)
+        return _alias
+    raise AttributeError(name)

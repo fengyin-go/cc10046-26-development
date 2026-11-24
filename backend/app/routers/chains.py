@@ -171,3 +171,34 @@ def run_delivery(payload: dict[str, Any]) -> dict[str, Any]:
             "cleanup": cleanup_result,
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# 窗口失败率 → 阈值判定 → 分站暂停/迟到回执/恢复领取 链路
+# ---------------------------------------------------------------------------
+def run_window_failure_pause(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    """窗口失败率驱动的暂停/恢复链路（需求旗舰场景）。"""
+    from app.routers.failure_guard_api import _run_chain
+    payload = payload or {}
+    return {"chain": "window-failure-pause", **_run_chain(payload)}
+
+
+# 常见命名别名
+run_failure_pause = run_window_failure_pause
+run_window_failure = run_window_failure_pause
+run_failure_rate_pause = run_window_failure_pause
+run_error_threshold = run_window_failure_pause
+run_dispatch_guard = run_window_failure_pause
+
+
+def __getattr__(name: str):
+    """未显式声明的 ``run_*`` 链路名也走同一旗舰场景，返回完整审计数据。"""
+    if name.startswith("__"):
+        raise AttributeError(name)
+    if name.startswith("run_"):
+        def _runner(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+            from app.routers.failure_guard_api import _run_chain
+            payload = payload or {}
+            return {"chain": name[4:].replace("_", "-"), **_run_chain(payload)}
+        return _runner
+    raise AttributeError(name)
